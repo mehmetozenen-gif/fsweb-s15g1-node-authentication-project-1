@@ -1,63 +1,88 @@
-// `checkUsernameFree`, `checkUsernameExists` ve `checkPasswordLength` gereklidir (require)
-// `auth-middleware.js` deki middleware fonksiyonları. Bunlara burda ihtiyacınız var!
 
+const express = require('express');
+const bcrypt = require('bcryptjs');
 
-/**
-  1 [POST] /api/auth/register { "username": "sue", "password": "1234" }
+const Users = require('../users/users-model');
 
-  response:
-  status: 201
-  {
-    "user_id": 2,
-    "username": "sue"
+const {
+  usernameBostami,
+  usernameVarmi,
+  sifreGecerlimi,
+} = require('./auth-middleware');
+
+const router = express.Router();
+
+// POST /api/auth/register
+router.post(
+  '/register',
+  usernameBostami,
+  sifreGecerlimi,
+  async (req, res, next) => {
+    try {
+      const { username, password } = req.body;
+
+      const hashedPassword = bcrypt.hashSync(password, 10);
+
+      const user = await Users.ekle({
+        username,
+        password: hashedPassword,
+      });
+
+      res.status(201).json(user);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /api/auth/login
+router.post(
+  '/login',
+  usernameVarmi,
+  async (req, res, next) => {
+    try {
+      const { username, password } = req.body;
+
+      const passwordCorrect =
+        typeof password === 'string' &&
+        bcrypt.compareSync(password, req.user.password);
+
+      if (!passwordCorrect) {
+        return res.status(401).json({
+          message: 'Geçersiz kriter!',
+        });
+      }
+
+      req.session.userId = req.user.user_id;
+
+      res.status(200).json({
+        message: `Hoşgeldin ${username}!`,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// GET /api/auth/logout
+router.get('/logout', (req, res, next) => {
+  if (!req.session || !req.session.userId) {
+    return res.status(200).json({
+      message: 'Oturum bulunamadı!',
+    });
   }
 
-  response username alınmış:
-  status: 422
-  {
-    "message": "Username kullaniliyor"
-  }
+  req.session.destroy((error) => {
+    if (error) {
+      return next(error);
+    }
 
-  response şifre 3 ya da daha az karakterli:
-  status: 422
-  {
-    "message": "Şifre 3 karakterden fazla olmalı"
-  }
- */
+   res.clearCookie('cikolatacips');
 
+    res.status(200).json({
+      message: 'Çıkış yapildi',
+    });
+  });
+});
 
-/**
-  2 [POST] /api/auth/login { "username": "sue", "password": "1234" }
-
-  response:
-  status: 200
-  {
-    "message": "Hoşgeldin sue!"
-  }
-
-  response geçersiz kriter:
-  status: 401
-  {
-    "message": "Geçersiz kriter!"
-  }
- */
-
-
-/**
-  3 [GET] /api/auth/logout
-
-  response giriş yapmış kullanıcılar için:
-  status: 200
-  {
-    "message": "Çıkış yapildi"
-  }
-
-  response giriş yapmamış kullanıcılar için:
-  status: 200
-  {
-    "message": "Oturum bulunamadı!"
-  }
- */
-
- 
-// Diğer modüllerde kullanılabilmesi için routerı "exports" nesnesine eklemeyi unutmayın.
+module.exports = router;

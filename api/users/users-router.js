@@ -1,29 +1,20 @@
-// `sinirli` middleware'ını `auth-middleware.js` dan require edin. Buna ihtiyacınız olacak!
 
+const express = require('express');
+const router = express.Router();
 
-/**
-  [GET] /api/users
+const Users = require('./users-model');
+const { sinirli } = require('../auth/auth-middleware');
 
-  Bu uç nokta SINIRLIDIR: sadece kullanıcı girişi yapmış kullanıcılar
-  ulaşabilir.
+// GET /api/users
+// Yalnızca giriş yapmış kullanıcılar erişebilir
+router.get('/', sinirli, async (req, res, next) => {
+  try {
+    const users = await Users.bul();
 
-  response:
-  status: 200
-  [
-    {
-      "user_id": 1,
-      "username": "bob"
-    },
-    // etc
-  ]
-
-  response giriş yapılamadıysa:
-  status: 401
-  {
-    "message": "Geçemezsiniz!"
+    res.status(200).json(users);
+  } catch (error) {
+    next(error);
   }
- */
+});
 
-
-// Diğer modüllerde kullanılabilmesi için routerı "exports" nesnesine eklemeyi unutmayın.
-
+module.exports = router;

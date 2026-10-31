@@ -1,49 +1,75 @@
-/*
-  Kullanıcının sunucuda kayıtlı bir oturumu yoksa
 
-  status: 401
-  {
-    "message": "Geçemezsiniz!"
+const Users = require('../users/users-model');
+
+// 1. Korumalı rotaları kontrol eder
+function sinirli(req, res, next) {
+  if (req.session && req.session.userId) {
+    return next();
   }
-*/
-function sinirli() {
 
+  return res.status(401).json({
+    message: 'Geçemezsiniz!',
+  });
 }
 
-/*
-  req.body de verilen username halihazırda veritabanında varsa
+// 2. Kullanıcı adı zaten kullanılıyor mu?
+async function usernameBostami(req, res, next) {
+  try {
+    const { username } = req.body || {};
 
-  status: 422
-  {
-    "message": "Username kullaniliyor"
+    const users = await Users.goreBul({ username });
+
+    if (users.length > 0) {
+      return res.status(422).json({
+        message: 'Username kullaniliyor',
+      });
+    }
+
+    next();
+  } catch (error) {
+    next(error);
   }
-*/
-function usernameBostami() {
-
 }
 
-/*
-  req.body de verilen username veritabanında yoksa
+// 3. Kullanıcı adı veritabanında var mı?
+async function usernameVarmi(req, res, next) {
+  try {
+    const { username } = req.body || {};
 
-  status: 401
-  {
-    "message": "Geçersiz kriter"
+    const users = await Users.goreBul({ username });
+
+    if (users.length === 0) {
+      return res.status(401).json({
+        message: 'Geçersiz kriter',
+      });
+    }
+
+    req.user = users[0];
+    next();
+  } catch (error) {
+    next(error);
   }
-*/
-function usernameVarmi() {
-
 }
 
-/*
-  req.body de şifre yoksa veya 3 karakterden azsa
+// 4. Şifre en az 3 karakter mi?
+function sifreGecerlimi(req, res, next) {
+  const { password } = req.body || {};
 
-  status: 422
-  {
-    "message": "Şifre 3 karakterden fazla olmalı"
+ if (
+  typeof password !== 'string' ||
+  password.length <= 3
+) {
+    return res.status(422).json({
+      message: 'Şifre 3 karakterden fazla olmalı',
+    });
   }
-*/
-function sifreGecerlimi() {
 
+  next();
 }
 
-// Diğer modüllerde kullanılabilmesi için fonksiyonları "exports" nesnesine eklemeyi unutmayın.
+module.exports = {
+  sinirli,
+  usernameBostami,
+  usernameVarmi,
+  sifreGecerlimi,
+};
